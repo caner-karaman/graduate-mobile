@@ -1,12 +1,15 @@
 import React from 'react';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
-import {PopMaximalismScreen} from './src/screens/PopMaximalismScreen';
+import {NavigationContainer} from '@react-navigation/native';
+import {AppNavigator} from './src/navigation/AppNavigator';
 import './global.css';
 
 export const App = () => {
   return (
     <SafeAreaProvider>
-      <PopMaximalismScreen />
+      <NavigationContainer>
+        <AppNavigator />
+      </NavigationContainer>
     </SafeAreaProvider>
   );
 };

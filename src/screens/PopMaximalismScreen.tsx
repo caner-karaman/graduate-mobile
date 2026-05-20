@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   Alert,
   ImageBackground,
@@ -16,6 +16,11 @@ import {PopBadge} from '../components/atoms/PopBadge';
 import {PopButton} from '../components/atoms/PopButton';
 import {PopCard} from '../components/molecules/PopCard';
 import {handleError} from '../utils/errorHandler';
+import {NativeStackScreenProps} from '@react-navigation/native-stack';
+import {AppStackParamList} from '../navigation/AppNavigator';
+
+interface PopMaximalismScreenProps
+  extends NativeStackScreenProps<AppStackParamList, 'PopMaximalism'> {}
 
 // Placeholder image assets (high saturation comic art style)
 const CAMERA_PLACEHOLDER =
@@ -24,13 +29,23 @@ const CAMERA_PLACEHOLDER =
 const GALLERY_PLACEHOLDER =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuDBdJoaGo9OyY52B3Fd2xCl0cpbU2E6ZKRRsYDZt0bn-C-1a6MFxgnVMkNFcLRfciMh6rFwR2kGhtFNgqpP1LWRiqB2g9e0TESRiwGTZoRKM1Nr7oAWJl_mVCEgyuPR5_qiWl0-xaEHGVKENL-K4rsuzcV1F2byJv2t5yD3k8Qq3NZkZaAMUX_sRmpGeqJOiLE83lk41hj3wHUZQTYzb-N5QyLco4cslLqpCB2YyXcqCYSqIhncfAj3eIZRX7MbcA8_fXmnIysmmec';
 
-export const PopMaximalismScreen = () => {
+export const PopMaximalismScreen = ({
+  navigation,
+}: PopMaximalismScreenProps) => {
   const [selectedImage, setSelectedImage] = useState<string | undefined>(
     undefined
   );
   const [sourceType, setSourceType] = useState<'camera' | 'gallery' | undefined>(
     undefined
   );
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      setSelectedImage(undefined);
+      setSourceType(undefined);
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const handleCameraLaunch = (): void => {
     try {
@@ -56,6 +71,7 @@ export const PopMaximalismScreen = () => {
             if (uri) {
               setSelectedImage(uri);
               setSourceType('camera');
+              navigation.navigate('UploadSuccess', {imageUri: uri});
             }
           }
         }
@@ -91,6 +107,7 @@ export const PopMaximalismScreen = () => {
             if (uri) {
               setSelectedImage(uri);
               setSourceType('gallery');
+              navigation.navigate('UploadSuccess', {imageUri: uri});
             }
           }
         }
@@ -113,11 +130,7 @@ export const PopMaximalismScreen = () => {
       return;
     }
 
-    Alert.alert(
-      'Mükemmel! 🎓⚡',
-      'Fotoğrafınız başarıyla yüklendi! Portre stüdyosuna aktarılıyor...',
-      [{text: 'Harika!', style: 'default'}]
-    );
+    navigation.navigate('UploadSuccess', {imageUri: selectedImage});
   };
 
   const handleResetImage = (): void => {
