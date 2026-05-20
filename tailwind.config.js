@@ -43,11 +43,16 @@ module.exports = {
         'error-container': '#93000a',
         'on-error-container': '#ffdad6',
         'surface-tint': '#adc6ff',
+        'pop-yellow': '#FFD700',
+        'pop-red': '#FF003C',
+        'pop-blue': '#00E5FF',
       },
       fontFamily: {
         headline: ['Plus Jakarta Sans'],
         body: ['Inter'],
         label: ['Inter'],
+        'pop-display': ['Impact', 'sans-serif-condensed'],
+        'pop-body': ['Arial Rounded MT Bold', 'System'],
       },
       borderRadius: {
         sm: '4px',
