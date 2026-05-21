@@ -2,10 +2,12 @@ import React from 'react';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {PopMaximalismScreen} from '../screens/PopMaximalismScreen';
 import {UploadSuccessScreen} from '../screens/UploadSuccessScreen';
+import {ComparisonScanRevealScreen} from '../screens/ComparisonScanRevealScreen';
 
 export type AppStackParamList = {
   PopMaximalism: undefined;
   UploadSuccess: {imageUri: string};
+  ComparisonScanReveal: {imageUri: string};
 };
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
@@ -26,6 +28,10 @@ export const AppNavigator = () => {
       <Stack.Screen
         name="UploadSuccess"
         component={UploadSuccessScreen}
+      />
+      <Stack.Screen
+        name="ComparisonScanReveal"
+        component={ComparisonScanRevealScreen}
       />
     </Stack.Navigator>
   );

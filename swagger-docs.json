@@ -1,0 +1,86 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "OpenAPI definition",
+        "version": "v0"
+    },
+    "servers": [
+        {
+            "url": "http://localhost:9000",
+            "description": "Generated server url"
+        }
+    ],
+    "tags": [
+        {
+            "name": "Graduation Image Resource",
+            "description": "Public API endpoints for graduation image transformations using Fal.ai"
+        }
+    ],
+    "paths": {
+        "/api/public/graduation-image/generate": {
+            "post": {
+                "tags": [
+                    "Graduation Image Resource"
+                ],
+                "summary": "Generate a graduation image from a selfie",
+                "description": "Uploads a user's selfie image and uses Fal.ai's img2img model to generate a realistic picture of the user graduating and throwing their cap.",
+                "operationId": "generateGraduationImage",
+                "requestBody": {
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "file": {
+                                        "type": "string",
+                                        "format": "binary",
+                                        "description": "The selfie image file (JPEG/PNG)"
+                                    }
+                                },
+                                "required": [
+                                    "file"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successfully generated image URL",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string",
+                                    "example": {
+                                        "url": "https://storage.googleapis.com/falserverless/example_outputs/image.png"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or empty file",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error or Fal.ai API failure",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {}
+}

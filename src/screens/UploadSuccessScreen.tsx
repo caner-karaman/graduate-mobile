@@ -80,7 +80,7 @@ export const UploadSuccessScreen = ({
   });
 
   const handleGoGraduate = (): void => {
-    navigation.navigate('PopMaximalism');
+    navigation.navigate('ComparisonScanReveal', {imageUri});
   };
 
   const handleChangePhoto = (): void => {
