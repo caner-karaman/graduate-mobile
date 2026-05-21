@@ -6,17 +6,18 @@ import {
   useWindowDimensions,
   PanResponder,
   GestureResponderEvent,
+  Alert,
 } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
   withSpring,
-  runOnJS,
 } from 'react-native-reanimated';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {AppStackParamList} from '../navigation/AppNavigator';
 import {handleError} from '../utils/errorHandler';
+import {useGenerateGraduationImage} from '../api/hooks/useGenerateGraduationImage';
 
 // Local dummy assets
 const SELFIE_IMAGE = require('../assets/images/selfie.jpg');
@@ -38,6 +39,38 @@ export const ComparisonScanRevealScreen = ({
   const [statusText, setStatusText] = useState('Initializing neural network...');
   const [isScanComplete, setIsScanComplete] = useState(false);
 
+  // API service hook for image generation
+  const {mutate, data: resultImageUri, isSuccess, isError, error} = useGenerateGraduationImage();
+
+  // Keep reference of success and URL for interval check
+  const isApiSuccessRef = useRef(false);
+  const resultImageUriRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (isSuccess && resultImageUri) {
+      isApiSuccessRef.current = true;
+      resultImageUriRef.current = resultImageUri;
+    }
+  }, [isSuccess, resultImageUri]);
+
+  // Start the API call on mount
+  useEffect(() => {
+    mutate({
+      imageUrl: imageUri,
+    });
+  }, [mutate, imageUri]);
+
+  // Handle API call errors
+  useEffect(() => {
+    if (isError && error) {
+      Alert.alert(
+        'Generation Failed',
+        'We could not generate your graduation portrait. Please try again.',
+        [{text: 'OK', onPress: () => navigation.goBack()}]
+      );
+    }
+  }, [isError, error, navigation]);
+
   // Sync scan status text with progress percentage
   useEffect(() => {
     if (progress < 25) {
@@ -46,8 +79,10 @@ export const ComparisonScanRevealScreen = ({
       setStatusText('Aligning facial features...');
     } else if (progress < 75) {
       setStatusText('Synthesizing graduation gown...');
-    } else if (progress < 100) {
+    } else if (progress < 95) {
       setStatusText('Applying style shaders...');
+    } else if (progress < 100) {
+      setStatusText('Generating graduation portrait...');
     } else {
       setStatusText('Transformation complete.');
     }
@@ -55,48 +90,69 @@ export const ComparisonScanRevealScreen = ({
 
   // Navigate to PopMaximalismResultScreen when scan is complete
   useEffect(() => {
-    if (isScanComplete) {
+    if (isScanComplete && isSuccess && resultImageUri) {
       const timer = setTimeout(() => {
-        navigation.navigate('PopMaximalismResult', {imageUri});
+        navigation.navigate('PopMaximalismResult', {imageUri: resultImageUri});
       }, 600);
       return () => clearTimeout(timer);
     }
-  }, [isScanComplete, navigation, imageUri]);
+  }, [isScanComplete, isSuccess, resultImageUri, navigation]);
 
   // Run the initial scan animation on mount
   useEffect(() => {
-    // 1. Reset values
+    // Reset values
     sliderX.value = 0;
     setProgress(0);
     setIsScanComplete(false);
+    isApiSuccessRef.current = false;
+    resultImageUriRef.current = null;
 
-    // 2. Animate slider line sweeping from left to right (0 to screenWidth)
-    sliderX.value = withTiming(screenWidth, {duration: 3500}, () => {
-      // 3. Sweep completed: animate back to 50% split view using spring animation
-      sliderX.value = withSpring(screenWidth / 2, {
-        damping: 15,
-        stiffness: 100,
-      });
-      // 4. Mark scanning process as complete
-      runOnJS(setIsScanComplete)(true);
-    });
-
-    // 5. Increment progress percentage simulation
-    const intervalTime = 35; // 35ms * 100 = 3500ms total duration
+    // Increment progress percentage simulation
+    const intervalTime = 35; // 35ms per tick
     const progressInterval = setInterval(() => {
       setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          return 100;
+        if (prev < 95) {
+          return prev + 1;
         }
-        return prev + 1;
+        if (prev === 95) {
+          // Pause at 95% until API successfully finishes
+          if (isApiSuccessRef.current) {
+            return 96;
+          }
+          return 95;
+        }
+        if (prev < 100) {
+          return prev + 1;
+        }
+        clearInterval(progressInterval);
+        return 100;
       });
     }, intervalTime);
 
     return () => {
       clearInterval(progressInterval);
     };
-  }, [screenWidth, sliderX]);
+  }, [sliderX]);
+
+  // Update slider position based on simulated progress
+  useEffect(() => {
+    if (!isScanComplete) {
+      sliderX.value = withTiming((progress / 100) * screenWidth, {
+        duration: 35,
+      });
+    }
+  }, [progress, screenWidth, sliderX, isScanComplete]);
+
+  // Handle final completion state when progress reaches 100
+  useEffect(() => {
+    if (progress === 100) {
+      sliderX.value = withSpring(screenWidth / 2, {
+        damping: 15,
+        stiffness: 100,
+      });
+      setIsScanComplete(true);
+    }
+  }, [progress, screenWidth, sliderX]);
 
   // Create PanResponder to handle horizontal dragging after scanning finishes
   const panResponder = useRef(
@@ -110,8 +166,8 @@ export const ComparisonScanRevealScreen = ({
         try {
           const touchX = evt.nativeEvent.pageX;
           sliderX.value = Math.max(0, Math.min(screenWidth, touchX));
-        } catch (error) {
-          handleError(error, {
+        } catch (err) {
+          handleError(err, {
             componentName: 'ComparisonScanRevealScreen',
             actionName: 'onPanResponderMove',
           });
@@ -139,7 +195,7 @@ export const ComparisonScanRevealScreen = ({
       {/* Base Image: User Selfie (Original Portrait) */}
       <View className="absolute inset-0 w-full h-full">
         <Image
-          source={SELFIE_IMAGE}
+          source={imageUri ? {uri: imageUri} : SELFIE_IMAGE}
           className="w-full h-full"
           resizeMode="cover"
         />
@@ -147,11 +203,11 @@ export const ComparisonScanRevealScreen = ({
 
       {/* Revealed Image: AI Graduation Portrait (Clipped by overlay width) */}
       <Animated.View
-        style={[animatedOverlayStyle, {height: screenHeight, zIndex: 10}]}
-        className="absolute left-0 top-0 overflow-hidden"
+        style={[animatedOverlayStyle, {height: screenHeight}]}
+        className="absolute left-0 top-0 overflow-hidden z-[10]"
       >
         <Image
-          source={GRADUATE_IMAGE}
+          source={resultImageUri ? {uri: resultImageUri} : GRADUATE_IMAGE}
           style={{width: screenWidth, height: screenHeight}}
           resizeMode="cover"
         />
@@ -159,8 +215,8 @@ export const ComparisonScanRevealScreen = ({
 
       {/* Slider Visual Handle & Divider Line */}
       <Animated.View
-        style={[animatedSliderStyle, {zIndex: 20}]}
-        className="absolute top-0 bottom-0 w-1 bg-white/80"
+        style={animatedSliderStyle}
+        className="absolute top-0 bottom-0 w-1 bg-white/80 z-[20]"
       >
         {/* Glowing visual effect for the line */}
         <View className="absolute inset-y-0 -left-1.5 w-4 bg-white/20 blur-sm" />
@@ -173,13 +229,7 @@ export const ComparisonScanRevealScreen = ({
 
       {/* Bottom Floating Control Card */}
       <View
-        style={{
-          position: 'absolute',
-          bottom: 40,
-          left: 20,
-          right: 20,
-          zIndex: 30,
-        }}
+        className="absolute bottom-10 left-5 right-5 z-[30]"
       >
         <View className="bg-surface/85 border border-white/10 rounded-2xl p-5 shadow-2xl flex flex-col gap-4">
           <View className="items-center">

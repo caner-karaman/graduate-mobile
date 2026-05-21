@@ -182,7 +182,7 @@ export const PopMaximalismResultScreen = ({
                 {/* Main Photo Frame */}
                 <View className="absolute inset-0 bg-white border-8 border-black rounded-3xl overflow-hidden">
                   <Image
-                    source={GRADUATE_IMAGE}
+                    source={imageUri ? {uri: imageUri} : GRADUATE_IMAGE}
                     className="w-full h-full object-cover"
                     resizeMode="cover"
                   />

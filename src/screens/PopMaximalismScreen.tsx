@@ -1,6 +1,7 @@
 import React, {useState, useEffect} from 'react';
 import {
   Alert,
+  ActivityIndicator,
   ImageBackground,
   SafeAreaView,
   ScrollView,
@@ -18,6 +19,7 @@ import {PopCard} from '../components/molecules/PopCard';
 import {handleError} from '../utils/errorHandler';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {AppStackParamList} from '../navigation/AppNavigator';
+import {useUploadFile} from '../api/hooks/useUploadFile';
 
 interface PopMaximalismScreenProps
   extends NativeStackScreenProps<AppStackParamList, 'PopMaximalism'> {}
@@ -33,11 +35,13 @@ export const PopMaximalismScreen = ({
   navigation,
 }: PopMaximalismScreenProps) => {
   const [selectedImage, setSelectedImage] = useState<string | undefined>(
-    undefined
+    undefined,
   );
-  const [sourceType, setSourceType] = useState<'camera' | 'gallery' | undefined>(
-    undefined
-  );
+  const [sourceType, setSourceType] = useState<
+    'camera' | 'gallery' | undefined
+  >(undefined);
+
+  const {mutate: uploadFile, isPending: isUploading} = useUploadFile();
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -46,6 +50,43 @@ export const PopMaximalismScreen = ({
     });
     return unsubscribe;
   }, [navigation]);
+
+  const handleImageSelected = (
+    uri: string,
+    type: 'camera' | 'gallery',
+  ): void => {
+    setSelectedImage(uri);
+    setSourceType(type);
+
+    uploadFile(
+      {uri},
+      {
+        onSuccess: (cdnUrl) => {
+          navigation.navigate('UploadSuccess', {imageUri: cdnUrl});
+        },
+        onError: (error) => {
+          handleError(error, {
+            componentName: 'PopMaximalismScreen',
+            actionName: 'handleImageSelected',
+          });
+          Alert.alert(
+            'Yükleme Başarısız 😢',
+            'Fotoğraf yüklenirken bir hata oluştu. Lütfen tekrar deneyin.',
+            [
+              {
+                text: 'Tamam',
+                style: 'default',
+                onPress: () => {
+                  setSelectedImage(undefined);
+                  setSourceType(undefined);
+                },
+              },
+            ],
+          );
+        },
+      },
+    );
+  };
 
   const handleCameraLaunch = (): void => {
     try {
@@ -69,12 +110,10 @@ export const PopMaximalismScreen = ({
           if (response.assets && response.assets.length > 0) {
             const uri = response.assets[0].uri;
             if (uri) {
-              setSelectedImage(uri);
-              setSourceType('camera');
-              navigation.navigate('UploadSuccess', {imageUri: uri});
+              handleImageSelected(uri, 'camera');
             }
           }
-        }
+        },
       );
     } catch (error) {
       handleError(error, {
@@ -105,12 +144,10 @@ export const PopMaximalismScreen = ({
           if (response.assets && response.assets.length > 0) {
             const uri = response.assets[0].uri;
             if (uri) {
-              setSelectedImage(uri);
-              setSourceType('gallery');
-              navigation.navigate('UploadSuccess', {imageUri: uri});
+              handleImageSelected(uri, 'gallery');
             }
           }
-        }
+        },
       );
     } catch (error) {
       handleError(error, {
@@ -120,18 +157,6 @@ export const PopMaximalismScreen = ({
     }
   };
 
-  const handleGoGraduate = (): void => {
-    if (!selectedImage) {
-      Alert.alert(
-        'Eksik Fotoğraf! 📸',
-        'Lütfen mezuniyet portrenizi oluşturmak için önce bir selfie çekin veya galeriden bir fotoğraf seçin!',
-        [{text: 'Tamam', style: 'default'}]
-      );
-      return;
-    }
-
-    navigation.navigate('UploadSuccess', {imageUri: selectedImage});
-  };
 
   const handleResetImage = (): void => {
     setSelectedImage(undefined);
@@ -221,8 +246,18 @@ export const PopMaximalismScreen = ({
             />
           </View>
 
+          {/* Upload Progress Indicator */}
+          {isUploading && (
+            <View className="mt-8 items-center gap-2">
+              <ActivityIndicator size="large" color="#FF2D55" />
+              <Text className="font-bold text-black text-base">
+                Fotoğraf yükleniyor...
+              </Text>
+            </View>
+          )}
+
           {/* Reset Action */}
-          {selectedImage && (
+          {selectedImage && !isUploading && (
             <View className="mt-8 items-center">
               <PopButton
                 onPress={handleResetImage}
@@ -233,16 +268,6 @@ export const PopMaximalismScreen = ({
             </View>
           )}
 
-          {/* Primary Action Button */}
-          <View className="mt-16 w-full items-center">
-            <PopButton
-              onPress={handleGoGraduate}
-              title="GO GRADUATE!"
-              color="red"
-              badgeText="POW!"
-              className="w-full max-w-sm"
-            />
-          </View>
         </ScrollView>
       </SafeAreaView>
     </ImageBackground>

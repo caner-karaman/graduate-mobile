@@ -5,10 +5,31 @@
  * OpenAPI spec version: v0
  */
 import { customInstance } from '../client';
-export type GenerateGraduationImageBody = {
-  /** The selfie image file (JPEG/PNG) */
+/**
+ * JSON body containing the source image URL
+ */
+export interface GenerateRequest {
+  /** Public URL of the source image */
+  imageUrl?: string;
+}
+
+export type UploadFileParams = {
+/**
+ * Optional subfolder in the bucket (e.g. 'avatars', 'graduation')
+ */
+folder?: string;
+};
+
+export type UploadFileBody = {
+  /** The file to upload (JPEG, PNG, PDF, etc.) */
   file: Blob;
 };
+
+export type UploadFile400 = { [key: string]: unknown };
+
+export type UploadFile415 = { [key: string]: unknown };
+
+export type UploadFile500 = { [key: string]: unknown };
 
 export type GenerateGraduationImage400 = { [key: string]: unknown };
 
@@ -18,22 +39,40 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
   /**
- * Uploads a user's selfie image and uses Fal.ai's img2img model to generate a realistic picture of the user graduating and throwing their cap.
- * @summary Generate a graduation image from a selfie
+ * Uploads a file (image, document, etc.) to the Cloudflare R2 bucket and returns the public CDN URL. Optionally specify a 'folder' parameter to organize files into subfolders.
+ * @summary Upload a file to Cloudflare R2 CDN
  */
-export const generateGraduationImage = (
-    generateGraduationImageBody?: GenerateGraduationImageBody,
+export const uploadFile = (
+    uploadFileBody?: UploadFileBody,
+    params?: UploadFileParams,
  options?: SecondParameter<typeof customInstance<string>>,) => {const formData = new FormData();
-if(generateGraduationImageBody?.file !== undefined) {
- formData.append(`file`, generateGraduationImageBody.file);
+if(uploadFileBody?.file !== undefined) {
+ formData.append(`file`, uploadFileBody.file);
  }
 
       return customInstance<string>(
-      {url: `/api/public/graduation-image/generate`, method: 'POST',
+      {url: `/api/public/upload`, method: 'POST',
       headers: {'Content-Type': 'multipart/form-data', },
-       data: formData
+       data: formData,
+        params
     },
       options);
     }
 
+/**
+ * Accepts a public image URL and uses Fal.ai's img2img model to generate a realistic picture of the user graduating and throwing their cap.
+ * @summary Generate a graduation image from an image URL
+ */
+export const generateGraduationImage = (
+    generateRequest: GenerateRequest,
+ options?: SecondParameter<typeof customInstance<string>>,) => {
+      return customInstance<string>(
+      {url: `/api/public/graduation-image/generate`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: generateRequest
+    },
+      options);
+    }
+
+export type UploadFileResult = NonNullable<Awaited<ReturnType<typeof uploadFile>>>
 export type GenerateGraduationImageResult = NonNullable<Awaited<ReturnType<typeof generateGraduationImage>>>
