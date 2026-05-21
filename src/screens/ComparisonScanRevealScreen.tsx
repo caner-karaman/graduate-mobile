@@ -26,10 +26,11 @@ interface ComparisonScanRevealScreenProps
   extends NativeStackScreenProps<AppStackParamList, 'ComparisonScanReveal'> {}
 
 export const ComparisonScanRevealScreen = ({
-  route: _route,
-  navigation: _navigation,
+  route,
+  navigation,
 }: ComparisonScanRevealScreenProps) => {
   const {width: screenWidth, height: screenHeight} = useWindowDimensions();
+  const {imageUri} = route.params;
 
   // Animation values
   const sliderX = useSharedValue(0);
@@ -51,6 +52,16 @@ export const ComparisonScanRevealScreen = ({
       setStatusText('Transformation complete.');
     }
   }, [progress]);
+
+  // Navigate to PopMaximalismResultScreen when scan is complete
+  useEffect(() => {
+    if (isScanComplete) {
+      const timer = setTimeout(() => {
+        navigation.navigate('PopMaximalismResult', {imageUri});
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [isScanComplete, navigation, imageUri]);
 
   // Run the initial scan animation on mount
   useEffect(() => {
