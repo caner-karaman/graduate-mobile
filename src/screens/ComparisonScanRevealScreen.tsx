@@ -42,16 +42,7 @@ export const ComparisonScanRevealScreen = ({
   // API service hook for image generation
   const {mutate, data: resultImageUri, isSuccess, isError, error} = useGenerateGraduationImage();
 
-  // Keep reference of success and URL for interval check
-  const isApiSuccessRef = useRef(false);
-  const resultImageUriRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    if (isSuccess && resultImageUri) {
-      isApiSuccessRef.current = true;
-      resultImageUriRef.current = resultImageUri;
-    }
-  }, [isSuccess, resultImageUri]);
 
   // Start the API call on mount
   useEffect(() => {
@@ -70,6 +61,23 @@ export const ComparisonScanRevealScreen = ({
       );
     }
   }, [isError, error, navigation]);
+
+  // Handle 60 seconds timeout
+  useEffect(() => {
+    if (isScanComplete) return;
+
+    const timeoutTimer = setTimeout(() => {
+      if (!isSuccess && !isError) {
+        Alert.alert(
+          'Request Timeout',
+          'The image generation process took too long. Please try again.',
+          [{text: 'OK', onPress: () => navigation.goBack()}]
+        );
+      }
+    }, 60000);
+
+    return () => clearTimeout(timeoutTimer);
+  }, [isSuccess, isError, isScanComplete, navigation]);
 
   // Sync scan status text with progress percentage
   useEffect(() => {
@@ -98,50 +106,87 @@ export const ComparisonScanRevealScreen = ({
     }
   }, [isScanComplete, isSuccess, resultImageUri, navigation]);
 
-  // Run the initial scan animation on mount
+  // Reset animation values on mount
   useEffect(() => {
-    // Reset values
     sliderX.value = 0;
     setProgress(0);
     setIsScanComplete(false);
-    isApiSuccessRef.current = false;
-    resultImageUriRef.current = null;
+  }, [sliderX]);
 
-    // Increment progress percentage simulation
-    const intervalTime = 35; // 35ms per tick
-    const progressInterval = setInterval(() => {
+  // Run progress simulation dynamically to match ~60 seconds duration
+  useEffect(() => {
+    if (isScanComplete) return;
+
+    if (progress >= 100) {
+      return;
+    }
+
+    // Determine delay for the next step based on progress
+    // Target is to reach 95% in ~58 seconds if API is still running.
+    // 0-25: 25 steps * 400ms = 10.00s
+    // 25-50: 25 steps * 550ms = 13.75s
+    // 50-80: 30 steps * 680ms = 20.40s
+    // 80-95: 15 steps * 920ms = 13.80s
+    // Total simulated time to 95%: ~57.95s
+    let delay = 600;
+    if (isSuccess && resultImageUri) {
+      // API has finished, speed up to 100%
+      delay = 25;
+    } else if (progress < 25) {
+      delay = 400;
+    } else if (progress < 50) {
+      delay = 550;
+    } else if (progress < 80) {
+      delay = 680;
+    } else if (progress < 95) {
+      delay = 920;
+    } else {
+      // Pause at 95% until API finishes (or timeout triggers at 60s)
+      delay = 200;
+    }
+
+    const timer = setTimeout(() => {
       setProgress((prev) => {
         if (prev < 95) {
           return prev + 1;
         }
         if (prev === 95) {
-          // Pause at 95% until API successfully finishes
-          if (isApiSuccessRef.current) {
+          if (isSuccess && resultImageUri) {
             return 96;
           }
-          return 95;
+          return 95; // Keep waiting
         }
         if (prev < 100) {
           return prev + 1;
         }
-        clearInterval(progressInterval);
         return 100;
       });
-    }, intervalTime);
+    }, delay);
 
-    return () => {
-      clearInterval(progressInterval);
-    };
-  }, [sliderX]);
+    return () => clearTimeout(timer);
+  }, [progress, isSuccess, resultImageUri, isScanComplete]);
 
   // Update slider position based on simulated progress
   useEffect(() => {
     if (!isScanComplete) {
+      let duration = 600;
+      if (isSuccess && resultImageUri) {
+        duration = 25;
+      } else if (progress < 25) {
+        duration = 400;
+      } else if (progress < 50) {
+        duration = 550;
+      } else if (progress < 80) {
+        duration = 680;
+      } else {
+        duration = 920;
+      }
+
       sliderX.value = withTiming((progress / 100) * screenWidth, {
-        duration: 35,
+        duration: duration,
       });
     }
-  }, [progress, screenWidth, sliderX, isScanComplete]);
+  }, [progress, screenWidth, sliderX, isScanComplete, isSuccess, resultImageUri]);
 
   // Handle final completion state when progress reaches 100
   useEffect(() => {

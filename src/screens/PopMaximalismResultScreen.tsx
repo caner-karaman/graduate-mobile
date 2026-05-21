@@ -1,7 +1,10 @@
 import React, {useEffect} from 'react';
 import {
+  Alert,
   Image,
   ImageBackground,
+  PermissionsAndroid,
+  Platform,
   SafeAreaView,
   ScrollView,
   Text,
@@ -19,6 +22,9 @@ import {PopBadge} from '../components/atoms/PopBadge';
 import {PopButton} from '../components/atoms/PopButton';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {AppStackParamList} from '../navigation/AppNavigator';
+import {CameraRoll} from '@react-native-camera-roll/camera-roll';
+import {handleError} from '../utils/errorHandler';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 
 // Local dummy assets
 const GRADUATE_IMAGE = require('../assets/images/graduate.png');
@@ -99,10 +105,102 @@ export const PopMaximalismResultScreen = ({
     };
   });
 
-  const handleGrabIt = (): void => {
-    // Trigger action (e.g. Save photo or download)
-    // For now we can navigate back to start or show success message
-    navigation.navigate('PopMaximalism');
+  const hasAndroidPermission = async (): Promise<boolean> => {
+    const version = typeof Platform.Version === 'string'
+      ? parseInt(Platform.Version, 10)
+      : Platform.Version;
+
+    if (version >= 33) {
+      return true;
+    }
+
+    const hasPermission = await PermissionsAndroid.check(
+      PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+    );
+    if (hasPermission) {
+      return true;
+    }
+
+    const status = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+      {
+        title: 'Galeri İzni',
+        message: 'Fotoğrafı galerinize kaydetmek için depolama iznine ihtiyacımız var.',
+        buttonPositive: 'Tamam',
+        buttonNegative: 'İptal',
+      },
+    );
+
+    return status === PermissionsAndroid.RESULTS.GRANTED;
+  };
+
+  const handleGrabIt = async (): Promise<void> => {
+    if (!imageUri) {
+      Alert.alert('Hata', 'Kaydedilecek fotoğraf bulunamadı.');
+      return;
+    }
+
+    let localPath: string | null = null;
+
+    try {
+      // 1. Android Specific: Check permissions
+      if (Platform.OS === 'android') {
+        const hasPermission = await hasAndroidPermission();
+        if (!hasPermission) {
+          Alert.alert(
+            'İzin Reddedildi',
+            'Fotoğrafı galeriye kaydetmek için depolama izni vermeniz gerekiyor.',
+          );
+          return;
+        }
+      }
+
+      // 2. Download remote/HTTP URL to local temporary file to bypass iOS validation/ATS restrictions
+      const res = await ReactNativeBlobUtil.config({
+        fileCache: true,
+        appendExt: 'png',
+      }).fetch('GET', imageUri);
+
+      localPath = res.path();
+
+      // 3. Save to photo library (prepend file:// protocol so CameraRoll loads the file correctly)
+      await CameraRoll.save(`file://${localPath}`, {type: 'photo', album: 'Graduate'});
+
+      // 4. Show success alert
+      Alert.alert(
+        'Başarılı 🎉',
+        'Fotoğraf galerinize başarıyla kaydedildi!',
+        [
+          {
+            text: 'Harika!',
+            onPress: () => {
+              navigation.navigate('PopMaximalism');
+            },
+          },
+        ],
+      );
+    } catch (err) {
+      handleError(err, {
+        componentName: 'PopMaximalismResultScreen',
+        actionName: 'handleGrabIt',
+      });
+      Alert.alert(
+        'Hata',
+        `Fotoğraf galeriye kaydedilirken bir hata oluştu: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      // 5. Clean up the downloaded temporary cache file
+      if (localPath) {
+        try {
+          await ReactNativeBlobUtil.fs.unlink(localPath);
+        } catch (cleanupErr) {
+          handleError(cleanupErr, {
+            componentName: 'PopMaximalismResultScreen',
+            actionName: 'handleGrabItCleanup',
+          });
+        }
+      }
+    }
   };
 
   const handleDoItAgain = (): void => {
