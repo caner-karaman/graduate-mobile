@@ -1,0 +1,180 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "OpenAPI definition",
+        "version": "v0"
+    },
+    "servers": [
+        {
+            "url": "http://localhost:9000",
+            "description": "Generated server url"
+        }
+    ],
+    "tags": [
+        {
+            "name": "Graduation Image Resource",
+            "description": "Public API endpoints for graduation image transformations using Fal.ai"
+        },
+        {
+            "name": "File Upload Resource",
+            "description": "Public API endpoint for uploading images/files to Cloudflare R2 CDN storage"
+        }
+    ],
+    "paths": {
+        "/api/public/upload": {
+            "post": {
+                "tags": [
+                    "File Upload Resource"
+                ],
+                "summary": "Upload a file to Cloudflare R2 CDN",
+                "description": "Uploads a file (image, document, etc.) to the Cloudflare R2 bucket and returns the public CDN URL. Optionally specify a 'folder' parameter to organize files into subfolders.",
+                "operationId": "uploadFile",
+                "parameters": [
+                    {
+                        "name": "folder",
+                        "in": "query",
+                        "description": "Optional subfolder in the bucket (e.g. 'avatars', 'graduation')",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "file": {
+                                        "type": "string",
+                                        "format": "binary",
+                                        "description": "The file to upload (JPEG, PNG, PDF, etc.)"
+                                    }
+                                },
+                                "required": [
+                                    "file"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "File uploaded successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string",
+                                    "example": {
+                                        "url": "https://cdn.is-hukuku.com/avatars/550e8400-e29b-41d4-a716-446655440000.jpg"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Empty or missing file",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "415": {
+                        "description": "Unsupported media type",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Upload failed (S3/R2 error)",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/public/graduation-image/generate": {
+            "post": {
+                "tags": [
+                    "Graduation Image Resource"
+                ],
+                "summary": "Generate a graduation image from an image URL",
+                "description": "Accepts a public image URL and uses Fal.ai's img2img model to generate a realistic picture of the user graduating and throwing their cap.",
+                "operationId": "generateGraduationImage",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GenerateRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successfully generated image URL",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string",
+                                    "example": {
+                                        "url": "https://storage.googleapis.com/falserverless/example_outputs/image.png"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing or blank imageUrl",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error or Fal.ai API failure",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "GenerateRequest": {
+                "type": "object",
+                "description": "JSON body containing the source image URL",
+                "properties": {
+                    "imageUrl": {
+                        "type": "string",
+                        "description": "Public URL of the source image",
+                        "example": "https://cdn.example.com/photo.jpg"
+                    }
+                }
+            }
+        }
+    }
+}
